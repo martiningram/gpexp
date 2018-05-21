@@ -1,0 +1,13 @@
+Package: gpexp
+Title: Experiments with Gaussian Processes
+Version: 0.0.0.9000
+Authors@R: person("Martin", "Ingram", email = "ingramm@student.unimelb.edu.au", role = c("aut", "cre"))
+Description: A little package to fit Gaussian Processes.
+Depends: R (>= 3.4.3)
+License: MIT
+Encoding: UTF-8
+LazyData: true
+Imports:
+        ggplot2,
+        pdist
+RoxygenNote: 6.0.1
