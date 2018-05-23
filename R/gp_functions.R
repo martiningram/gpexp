@@ -48,6 +48,39 @@ diag_rbf_kernel <- function(v1, v2, l, tau) {
   }
 }
 
+#' Compute an ARD Kernel
+#'
+#' This function computes the ARD kernel for two data matrices.
+#'
+#' @param x1 Matrix of shape (N1, D).
+#' @param x2 Matrix of shape (N2, D).
+#' @param sigma_inv Diagonal matrix of shape (D, D) with the weights for each
+#' dimension D.
+#' @return The (N1, N2) kernel between each row of x1 and x2.
+#' @export
+ard_kernel <- function(x1, x2, sigma_inv) {
+    
+    # First, let's weight each dimension by its sigma.
+    diag_sigma_inv <- diag(sigma_inv)
+    x1_re_weighted <- sweep(x1, 2, diag_sigma_inv, 
+                            function (x, y) x * sqrt(y))
+    x2_re_weighted <- sweep(x2, 2, diag_sigma_inv, 
+                            function (x, y) x * sqrt(y))
+    
+    if (identical(x1, x2)) {
+        if (nrow(x1) == 1) {
+            return(as.matrix(1))
+        }
+        distances <- as.matrix(dist(x1_re_weighted))^2
+    } else {
+        distances <- as.matrix(pdist(x1_re_weighted, x2_re_weighted))^2
+    }
+                            
+    return(exp(-0.5 * distances))
+                            
+}
+
+
 #' Compute an inverse using the Cholesky decomposition
 #'
 #' This function computes the inverse of a positive definite matrix using the
@@ -73,10 +106,15 @@ cholesky_inverse <- function(matrix_to_invert) {
 #' @param kernel_fun The kernel to use.
 #' @return A list containing entries `mean` and `cov` specifying the mean and
 #' covariance at the points given by `x_new`.
-predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun) {
-  # Standardise y first
-  mean_y <- mean(y)
-  y <- y - mean_y
+#' @export
+predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun,
+                           mean_centre=TRUE) {
+
+  if (mean_centre) {
+    # Standardise y first
+    mean_y <- mean(y)
+    y <- y - mean_y
+  }
 
   # Compute the main inverse
   training_part <- kernel_fun(x_train, x_train)
@@ -88,10 +126,16 @@ predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun) {
   times_inv <- new_with_train %*% inverse
 
   predicted_mean <- times_inv %*% y
-  predicted_cov <- kernel_fun(x_new, x_new) - (times_inv %*% t(new_with_train))
+  k_star_star <- kernel_fun(x_new, x_new)
+  var_accounted_for <- times_inv %*% t(new_with_train)
+  predicted_cov <- k_star_star - var_accounted_for
 
-  return(list('mean' = predicted_mean + mean_y,
-              'cov' = predicted_cov))
+  if (mean_centre) {
+    # Add mean back on
+    predicted_mean <- predicted_mean + mean_y
+  }
+
+  return(list('mean' = predicted_mean, 'cov' = predicted_cov))
 }
 
 #' Fits the hyperparameters of a single RBF kernel by mAP estimation
@@ -174,6 +218,7 @@ optimise_and_fit_rbf_gp <- function(x_train, y_train, x_new, start_sigma = 10,
 }
 
 #' @import ggplot2
+#' @export
 plot_gp <- function(x, mean, covariance, sigma, x_train = NULL, y_train = NULL) {
   
   vars <- diag(covariance)
