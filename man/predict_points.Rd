@@ -4,7 +4,8 @@
 \alias{predict_points}
 \title{Fit an exact GP and predict a set of points}
 \usage{
-predict_points(x_train, x_new, sigma_noise, y, kernel_fun, mean_centre = TRUE)
+predict_points(x_train, x_new, sigma_noise, y, kernel_fun, mean_centre = TRUE,
+  marginals_only = FALSE)
 }
 \arguments{
 \item{x_train}{The training covariates.}

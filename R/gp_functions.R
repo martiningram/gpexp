@@ -59,7 +59,7 @@ diag_rbf_kernel <- function(v1, v2, l, tau) {
 #' @return The (N1, N2) kernel between each row of x1 and x2.
 #' @export
 ard_kernel <- function(x1, x2, sigma_inv) {
-    
+
     # First, let's weight each dimension by its sigma.
     diag_sigma_inv <- diag(sigma_inv)
     x1_re_weighted <- sweep(x1, 2, diag_sigma_inv, 
@@ -73,7 +73,7 @@ ard_kernel <- function(x1, x2, sigma_inv) {
         }
         distances <- as.matrix(dist(x1_re_weighted))^2
     } else {
-        distances <- as.matrix(pdist(x1_re_weighted, x2_re_weighted))^2
+        distances <- as.matrix(pdist::pdist(x1_re_weighted, x2_re_weighted))^2
     }
                             
     return(exp(-0.5 * distances))
@@ -94,6 +94,20 @@ cholesky_inverse <- function(matrix_to_invert) {
 
 }
 
+predict_using_inverse <- function(x_new, x_train, y, inverse, kernel_fun) {
+
+  k_star_star <- kernel_fun(x_new, x_new)
+  new_with_train <- kernel_fun(x_new, x_train)
+  times_inv <- new_with_train %*% inverse
+
+  predicted_mean <- times_inv %*% y
+  var_accounted_for <- times_inv %*% t(new_with_train)
+  predicted_cov <- k_star_star - var_accounted_for
+
+  return(list('mean' = predicted_mean, 'cov' = predicted_cov))
+
+}
+
 #' Fit an exact GP and predict a set of points
 #'
 #' This function fits and predicts a GP using the exact expressions for mean and
@@ -108,7 +122,7 @@ cholesky_inverse <- function(matrix_to_invert) {
 #' covariance at the points given by `x_new`.
 #' @export
 predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun,
-                           mean_centre=TRUE) {
+                           mean_centre = TRUE, marginals_only = FALSE) {
 
   if (mean_centre) {
     # Standardise y first
@@ -119,16 +133,39 @@ predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun,
   # Compute the main inverse
   training_part <- kernel_fun(x_train, x_train)
   diag(training_part) <- diag(training_part) + sigma_noise^2
-
   inverse <- chol2inv(chol(training_part))
 
-  new_with_train <- kernel_fun(x_new, x_train)
-  times_inv <- new_with_train %*% inverse
+  if (marginals_only) {
 
-  predicted_mean <- times_inv %*% y
-  k_star_star <- kernel_fun(x_new, x_new)
-  var_accounted_for <- times_inv %*% t(new_with_train)
-  predicted_cov <- k_star_star - var_accounted_for
+    # We can do this in batches.
+    batch_size <- 256
+    assignments <- seq(nrow(x_new)) %/% batch_size
+    predictions <- list('mean' = c(), 'cov' = c())
+
+    for (cur_assignment in unique(assignments)) {
+      cur_x_new <- as.matrix(x_new[assignments == cur_assignment, ])
+      cur_predictions <- predict_using_inverse(cur_x_new, x_train, y, inverse,
+                                               kernel_fun)
+      # Pick out only the diagonal
+      diag_cov <- diag(cur_predictions[['cov']])
+      predictions[['cov']] <- c(predictions[['cov']], diag_cov)
+      predictions[['mean']] <- c(predictions[['mean']],
+                                 cur_predictions[['mean']])
+    }
+
+    # Turn the diagonal covariance matrix into a proper matrix
+    new_size <- length(predictions[['cov']])
+    predictions[['cov']] <- diag(predictions[['cov']], nrow=new_size,
+                                 ncol=new_size)
+
+  } else {
+
+    predictions = predict_using_inverse(x_new, x_train, y, inverse, kernel_fun)
+
+  }
+
+  predicted_mean <- predictions[['mean']]
+  predicted_cov <- predictions[['cov']]
 
   if (mean_centre) {
     # Add mean back on
@@ -219,7 +256,8 @@ optimise_and_fit_rbf_gp <- function(x_train, y_train, x_new, start_sigma = 10,
 
 #' @import ggplot2
 #' @export
-plot_gp <- function(x, mean, covariance, sigma, x_train = NULL, y_train = NULL) {
+plot_gp <- function(x, mean, covariance, sigma, x_train = NULL, y_train = NULL,
+                    save_to = NULL) {
   
   vars <- diag(covariance)
   
@@ -249,6 +287,11 @@ plot_gp <- function(x, mean, covariance, sigma, x_train = NULL, y_train = NULL) 
       geom_point(data = train_df, aes(x = x, y = y, 
                                       colour = 'Observations'), 
                             inherit.aes=FALSE)
+  }
+
+  if (!is.null(save_to)) {
+    # Save the plot to the file specified
+    ggsave(save_to, height=4, width=8, dpi=300)
   }
   
   return(p)
