@@ -8,7 +8,7 @@
 #' @param tau The standard deviation of the kernel.
 #' @return A matrix containing the distances between each of the elements in v1
 #' and v2.
-full_rbf_kernel <- function(v1, v2, l, tau, jitter=1e-8) {
+full_rbf_kernel <- function(v1, v2, l, tau, jitter=0.) {
   # This is the non-squared distance matrix.
   if (identical(v1, v2)) {
     distances <- dist(v1)
@@ -190,12 +190,12 @@ predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun,
 #' @return A list containing entries `sigma`, `l` and `tau` -- the optimised
 #' hyperparameters of the RBF kernel.
 fit_marginal_likelihood_rbf <- function(x_train, y_train, start_sigma = 10,
-                                        start_l = 10, start_tau = 10) {
+                                        start_l = 10, start_tau = 10, kernel_jitter=0.) {
 
   y_train <- y_train - mean(y_train)
 
   to_optimize <- function(sigma, l, tau) {
-    kernel <- full_rbf_kernel(x_train, x_train, tau = tau, l = l)
+    kernel <- full_rbf_kernel(x_train, x_train, tau = tau, l = l, jitter=kernel_jitter)
     diag(kernel) <- diag(kernel) + sigma^2
 
     signed_det <- determinant(kernel, logarithm = TRUE)
