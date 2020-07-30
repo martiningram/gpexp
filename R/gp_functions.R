@@ -8,7 +8,7 @@
 #' @param tau The standard deviation of the kernel.
 #' @return A matrix containing the distances between each of the elements in v1
 #' and v2.
-full_rbf_kernel <- function(v1, v2, l, tau) {
+full_rbf_kernel <- function(v1, v2, l, tau, jitter=1e-8) {
   # This is the non-squared distance matrix.
   if (identical(v1, v2)) {
     distances <- dist(v1)
@@ -19,7 +19,7 @@ full_rbf_kernel <- function(v1, v2, l, tau) {
 
   distances <- as.matrix(distances)
   kernel_matrix <- exp(-distances^2 / (2 * l^2))
-  return(tau^2 * kernel_matrix)
+  return(tau^2 * kernel_matrix + diag(rep(jitter, nrow(kernel_matrix)))
 }
 
 #' Compute a diagonal RBF kernel
