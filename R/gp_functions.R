@@ -19,8 +19,9 @@ full_rbf_kernel <- function(v1, v2, l, tau, jitter=1e-8) {
 
   distances <- as.matrix(distances)
   kernel_matrix <- exp(-distances^2 / (2 * l^2))
-  jitter_shape <- min(nrow(kernel_matrix), ncol(kernel_matrix))
-  return(tau^2 * kernel_matrix + diag(rep(jitter, jitter_shape)))
+  kernel_matrix <- tau^2 * kernel_matrix
+  diag(kernel_matrix) <- diag(kernel_matrix) + jitter
+  return(kernel_matrix)
 }
 
 #' Compute a diagonal RBF kernel
