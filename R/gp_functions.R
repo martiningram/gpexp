@@ -190,7 +190,10 @@ predict_points <- function(x_train, x_new, sigma_noise, y, kernel_fun,
 #' @return A list containing entries `sigma`, `l` and `tau` -- the optimised
 #' hyperparameters of the RBF kernel.
 fit_marginal_likelihood_rbf <- function(x_train, y_train, start_sigma = 10,
-                                        start_l = 10, start_tau = 10, kernel_jitter=0.) {
+                                        start_l = 10, start_tau = 10,
+                                        kernel_jitter=0.,
+                                        lengthscale_prior_fn=function (x)
+                                            dgamma(x, shape=3, rate=3, log=TRUE)) {
 
   y_train <- y_train - mean(y_train)
 
@@ -202,8 +205,10 @@ fit_marginal_likelihood_rbf <- function(x_train, y_train, start_sigma = 10,
     first_part <- signed_det[['sign']] * signed_det[['modulus']]
     second_part <- t(y_train) %*% chol2inv(chol(kernel)) %*% y_train
 
-    # We want to minimize, so it's the sum of these
-    return(first_part + second_part)
+    lengthscale_prior <- lengthscale_prior_fn(l)
+
+    # We want to minimize, so it's the sum of these (and we negate the prior)
+    return(first_part + second_part - lengthscale_prior)
   }
 
   vector_wrapper <- function(x) {
