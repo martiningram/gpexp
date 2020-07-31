@@ -207,16 +207,16 @@ fit_marginal_likelihood_rbf <- function(x_train, y_train, start_sigma = 10,
   }
 
   vector_wrapper <- function(x) {
-    return(to_optimize(sigma = x[1], l = x[2], tau = x[3]))
+    return(to_optimize(sigma = exp(x[1]), l = exp(x[2]), tau = exp(x[3])))
   }
 
   start_par <- c(start_sigma, start_l, start_tau)
 
-  fit_result <- optim(start_par, vector_wrapper)
+  fit_result <- optim(log(start_par), vector_wrapper)
 
-  params <- list('sigma' = fit_result$par[1],
-                 'l' = fit_result$par[2],
-                 'tau' = fit_result$par[3])
+  params <- list('sigma' = exp(fit_result$par[1]),
+                 'l' = exp(fit_result$par[2]),
+                 'tau' = exp(fit_result$par[3]))
 
   return(params)
 }
